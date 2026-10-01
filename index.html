@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Practice finding the mean: add the values, then divide by the number of values.">
+<title>Mean Practice</title>
+<style>
+:root{color-scheme:light dark}
+body{margin:0;padding:16px;background:light-dark(#ffffff,#181818);font-family:system-ui,sans-serif}
+.cursor-interaction{cursor:pointer}
+
+#mean-practice{--mean-ink:light-dark(#182a37,#e8f0f3);--mean-sub:light-dark(#526675,#afbdc6);--mean-line:light-dark(#d3dfe4,#40515e);--mean-accent:light-dark(#126b69,#76d3c9);--mean-button:light-dark(#176864,#82d9cd);--mean-button-text:light-dark(#ffffff,#102a28);--mean-error:light-dark(#a3342f,#ffaaa1);font-family:system-ui,sans-serif;color:var(--mean-ink);max-width:760px;margin:auto;padding:16px 0 24px}
+#mean-practice *{box-sizing:border-box}#mean-practice [hidden]{display:none!important}
+#mean-practice header{padding-right:90px}#mean-practice h2{font-size:24px;font-weight:500;margin:0}#mean-practice h3{font-size:18px;font-weight:500;margin:0 0 8px}
+#mean-practice p{margin:0;line-height:1.5}#mean-practice .mean-prompt{margin:26px 0 20px}#mean-direction,#mean-calculation{color:var(--mean-sub)}
+#mean-values{margin:20px 0 26px;font-size:24px;font-weight:500;line-height:1.6;font-variant-numeric:tabular-nums}
+#mean-known{color:var(--mean-accent);font-size:15px;font-weight:500;margin-bottom:14px!important}
+#mean-entry{margin:18px 0 10px}#mean-label{display:block;font-size:14px;font-weight:500;margin-bottom:8px}
+#mean-answer{width:170px;font:400 17px system-ui,sans-serif;border:1px solid var(--mean-line);border-radius:8px;background:transparent;color:var(--mean-ink);padding:9px 10px;max-width:100%;font-variant-numeric:tabular-nums}
+#mean-answer[aria-invalid="true"]{border-color:var(--mean-error)}
+#mean-hint{font-size:13px;color:var(--mean-sub)}
+#mean-message{min-height:24px;margin:12px 0!important;font-size:14px;color:var(--mean-error)}#mean-message.success{color:var(--mean-accent)}
+#mean-actions,#mean-review{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#mean-practice button{font:500 14px system-ui,sans-serif;padding:12px 17px;border-radius:8px}
+#mean-practice .mean-primary{border:1px solid transparent;background:var(--mean-button);color:var(--mean-button-text)}#mean-practice .mean-secondary{border:1px solid var(--mean-line);background:transparent;color:var(--mean-ink)}
+#mean-practice button:disabled{opacity:.45;cursor:default}#mean-practice button:focus-visible,#mean-practice input:focus-visible{outline:3px solid var(--mean-accent);outline-offset:3px}
+#mean-review{margin-top:20px}#mean-review span{color:var(--mean-sub);font-size:13px}#mean-next{margin-top:20px}#mean-worked{margin-top:12px}
+@media(max-width:480px){#mean-values{font-size:20px}}
+
+</style>
+</head>
+<body>
+<main>
+<div id="mean-practice">
+  <header><h2>Mean</h2></header>
+  <div class="mean-prompt" aria-live="polite"><h3 id="mean-title"></h3><p id="mean-direction"></p></div>
+  <div id="mean-values" role="group" aria-label="Data values"></div>
+  <p id="mean-known" hidden></p>
+  <div id="mean-entry">
+    <label id="mean-label" for="mean-answer"></label>
+    <input id="mean-answer" type="text" inputmode="decimal" autocomplete="off" placeholder="Your answer" aria-describedby="mean-hint mean-message">
+  </div>
+  <p id="mean-hint" hidden>Round to two decimal places if needed. You may also enter a fraction.</p>
+  <p id="mean-message" role="status" aria-live="polite"></p>
+  <div id="mean-actions">
+    <button id="mean-check" class="mean-primary cursor-interaction" type="button">Check answer</button>
+    <button id="mean-skip" class="mean-secondary cursor-interaction" type="button">Skip step</button>
+  </div>
+  <div id="mean-worked" hidden aria-live="polite"><h3 id="mean-result"></h3><p id="mean-calculation"></p></div>
+  <div id="mean-review" hidden role="group" aria-label="Review the solution steps">
+    <span>Review steps</span>
+    <button id="mean-back" class="mean-secondary cursor-interaction" type="button">← Back</button>
+    <button id="mean-forward" class="mean-secondary cursor-interaction" type="button">Forward →</button>
+  </div>
+  <button id="mean-next" hidden class="mean-primary cursor-interaction" type="button">Try another set →</button>
+</div>
+</main>
+<script>
+
+(()=>{
+ const root=document.getElementById('mean-practice'),q=s=>root.querySelector(s);
+ const entry=q('#mean-answer'),message=q('#mean-message');
+ let values=[],sum=0,mean=0,step=0,finished=false,busy=false,bag=[];
+ const randomInt=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+ const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=randomInt(0,i);[a[i],a[j]]=[a[j],a[i]];}return a;};
+ const labels=['Sum','Mean'];
+ const expected=()=>step===0?sum:mean;
+ const format=n=>String(Number(n.toFixed(2)));
+ const relation=()=>sum*100%values.length===0?' = ':' ≈ ';
+ const calculation=()=>step===0?values.join(' + ')+' = '+sum:sum+' ÷ '+values.length+relation()+format(mean);
+ function parseNumber(raw){
+   const text=raw.trim();
+   if(/^[+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text))return Number(text);
+   const fraction=text.match(/^(\d+)\s*\/\s*(\d+)$/);
+   return fraction&&Number(fraction[2])!==0?Number(fraction[1])/Number(fraction[2]):NaN;
+ }
+ function generateValues(){
+   if(!bag.length)bag=shuffle([5,6,7]);
+   const count=bag.pop(),width=randomInt(20,30),low=randomInt(0,100-width);
+   return Array.from({length:count},()=>randomInt(low,low+width));
+ }
+ function clearMessage(){message.textContent='';message.classList.remove('success');entry.removeAttribute('aria-invalid');}
+ function syncControls(){
+   entry.disabled=busy;q('#mean-check').disabled=busy;q('#mean-skip').disabled=busy;
+   q('#mean-back').disabled=step===0;q('#mean-forward').disabled=step===1;
+ }
+ function render(){
+   q('#mean-title').textContent=finished&&step===1?'You found the mean.':['Add the values.','Divide to find the mean.'][step];
+   q('#mean-direction').textContent=step===0?'Find the sum of all the numbers.':'Divide the sum by the number of values. There are '+values.length+' values.';
+   q('#mean-values').textContent=values.join(', ');
+   q('#mean-known').hidden=step===0;
+   q('#mean-known').textContent='Sum = '+sum+' · Number of values = '+values.length;
+   q('#mean-hint').hidden=finished||step===0;
+   q('#mean-label').textContent=labels[step];entry.value='';
+   q('#mean-entry').hidden=finished;q('#mean-actions').hidden=finished;
+   q('#mean-worked').hidden=!finished;q('#mean-review').hidden=!finished;q('#mean-next').hidden=!finished;
+   q('#mean-result').textContent=labels[step]+(step===0?' = ':relation())+format(expected());
+   q('#mean-calculation').textContent=calculation();
+   syncControls();
+ }
+ function fresh(){
+   if(busy)return;
+   values=generateValues();sum=values.reduce((a,b)=>a+b,0);mean=sum/values.length;step=0;finished=false;
+   clearMessage();render();
+ }
+ async function advance(skipped){
+   busy=true;syncControls();message.classList.add('success');
+   message.textContent=(skipped?'':'Correct · ')+calculation();
+   const reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+   await new Promise(resolve=>setTimeout(resolve,reduced?0:650));
+   if(step===1)finished=true;else step++;
+   busy=false;clearMessage();render();
+   (finished?q('#mean-back'):entry).focus({preventScroll:true});
+ }
+ function check(){
+   if(busy||finished)return;clearMessage();
+   const value=parseNumber(entry.value);
+   const correct=Number.isFinite(value)&&(Math.abs(value-expected())<1e-9||(step===1&&Math.abs(value-Number(mean.toFixed(2)))<1e-9));
+   if(!correct){
+     message.textContent=!Number.isFinite(value)?'Enter a number'+(step===1?' or a fraction.':'.'):step===0?'Not quite. Add all '+values.length+' values together.':'Not quite. Divide '+sum+' by '+values.length+'. Round to two decimal places if needed.';
+     entry.setAttribute('aria-invalid','true');entry.focus();entry.select();return;
+   }
+   advance(false);
+ }
+ q('#mean-check').addEventListener('click',check);
+ entry.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();check();}});
+ entry.addEventListener('input',()=>{if(!busy)clearMessage();});
+ q('#mean-skip').addEventListener('click',()=>{
+   if(busy||finished)return;clearMessage();entry.value=format(expected());advance(true);
+ });
+ function review(delta){if(!finished||busy)return;const next=step+delta;if(next<0||next>1)return;step=next;clearMessage();render();}
+ q('#mean-back').addEventListener('click',()=>review(-1));q('#mean-forward').addEventListener('click',()=>review(1));
+ q('#mean-next').addEventListener('click',()=>{fresh();entry.focus({preventScroll:true});});
+ fresh();
+})();
+
+</script>
+</body>
+</html>
